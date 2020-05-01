@@ -1,0 +1,16 @@
+{
+  "name": "pistat",
+  "version": "1.0.0",
+  "description": "A modern control system for an old AC unit.",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Logan",
+  "license": "MIT",
+  "dependencies": {
+    "ds18b20": "^0.1.0",
+    "johnny-five": "^1.4.0",
+    "mqtt": "^4.0.0"
+  }
+}
