@@ -208,7 +208,7 @@ client.on('message', function (topic, message) {
     // message is Buffer
     //console.log("Incoming command message: " + message.toString())
     if (message.toString().includes("setTemp")) {
-        setTemp = message.toString().slice(message.toString().lastIndexOf('_') + 1);
+        setTemp = Number(message.toString().slice(message.toString().lastIndexOf('_') + 1));
         updateStatus();
     }
     if (message.toString() === "ON") {
