@@ -146,7 +146,7 @@ function updateStatus() {
     // Build JSON status report
     let statusJSON = {
         "System-Enabled": systemEnabled,
-        "Duty": currentDuty,
+        'Duty': currentDuty,
         "Current Cool Time": cycleTime,
         "Compressor Running": compressorOn,
         "Fan Running": fanOn,
@@ -206,7 +206,7 @@ client.publish(MQTTchannel, `Client ${clientID} is online!`);
 // For client listening to command publisher: 
 client.on('message', function (topic, message) {
     // message is Buffer
-    console.log("Incoming command message: " + message.toString())
+    //console.log("Incoming command message: " + message.toString())
     if (message.toString().includes("setTemp")) {
         setTemp = message.slice(message.lastIndexOf('_') + 1);
         updateStatus();
