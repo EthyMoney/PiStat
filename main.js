@@ -75,7 +75,9 @@ client.on('connect', function () {
 })
 
 // Set the status checker to run on a schedule
-var statusScheduler = schedule.scheduleJob('*/5 * * * *', updateStatus());
+var statusScheduler = schedule.scheduleJob('*/5 * * * *', updateStatus);
+// And run once for startup
+updateStatus();
 
 
 
