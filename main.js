@@ -222,6 +222,14 @@ client.on('message', function (topic, message) {
     if (message.toString() === "status") {
         updateStatus();
     }
+    if (message.toString() === "COOL") {
+        cool();
+        updateStatus();
+    }
+    if (message.toString() === "STOP") {
+        shutdown();
+        updateStatus();
+    }
 })
 
 
