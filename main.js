@@ -76,8 +76,6 @@ client.on('connect', function () {
 
 // Set the status checker to run on a schedule
 var statusScheduler = schedule.scheduleJob('*/5 * * * *', updateStatus());
-// And run once for startup
-updateStatus();
 
 
 
@@ -159,7 +157,7 @@ function updateStatus() {
     // Log the status
     // updateLCD(statusJSON);
     console.log(statusJSON);
-    client.publish(MQTTchannel, statusJSON);
+    client.publish(MQTTchannel, JSON.stringify(statusJSON));
 }
 
 
