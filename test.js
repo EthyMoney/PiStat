@@ -1,5 +1,6 @@
 let nice = "setTemp_26";
 console.log(nice.slice(nice.lastIndexOf('_') + 1));
+var Raspi = require("raspi-io").RaspiIO;
 
 let statusJSON = {
     "System-Enabled": false,
@@ -14,3 +15,16 @@ let statusJSON = {
 console.log(statusJSON.toString().includes("setTemp"))
 
 console.log("".length)
+
+var five = require("johnny-five");
+var board = new five.Board({
+    io: new Raspi()
+});
+
+board.on('ready', () => {
+    var count = 0;
+    var lcd = new five.LCD({
+        controller: "PCF8574AT"
+    });
+    lcd.print("hmmmmm");
+});
