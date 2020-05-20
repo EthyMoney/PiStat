@@ -29,11 +29,8 @@ Started: 5/13/2020
 //                     Setup and Declarations
 //##################################################################
 
-// IMPORTANT!! This defines the client ID number of the program. Set this number for whatever unique pi you put this program onto.
+// Instance values
 let clientID = 9;
-
-// IMPORTANT!! These define the pinouts to use for whatever devices you have. Not all of these have to be used, just set the
-// ones you will use with your particuluar client.
 let fanRelay = 23;
 let compressorRelay = 24;
 
@@ -42,42 +39,45 @@ let currentTemp = 70; //needs to get set by sensor
 let setTemp = 76; //default
 let compressorOn = false;
 let fanOn = false;
-let cycleTime = 0;
+let cycleTime = '';
 let systemEnabled = false;
-let currentDuty = 'Off';
-let coolCommandRunning = false;
-let shutdownCommandRunning = false;
+let currentDuty = 'OFF';
+let startTime = new Date();
 
-/* IMPORTANT!! This value defines the MQTT channel to listen and publish to. It can be a string of your choosing, but make sure 
-it matches your other devices so everything is on the same channel to communicate. WARNING: This channel can be listened 
-and published to by anyone that knows what it is. Be sure to keep this value private if your application controls sensitive
-devices in your use case. Makes for a pretty fun prank to play on a buddy tho ;) */
+// Setup service veriables
 let MQTTchannel = "pi9_aircon";
-
-// This will wait for data that never comes, which keeps this process from terminating.
-process.stdin.resume();
-
+let chalk = require('chalk');
+var mqtt = require('mqtt');
+var client = mqtt.connect('mqtt://192.168.1.28');
 var schedule = require('node-schedule');
 var rpio = require('rpio');
-rpio.init({ gpiomem: true });   // You may need to switch this to the devmem pool when using PWM and i2c
+rpio.init({ gpiomem: false });
 rpio.init({ mapping: 'gpio' });
 
-var mqtt = require('mqtt')
-var client = mqtt.connect('mqtt://192.168.1.55')
+// Configure the relay gpio pins
+rpio.open(fanRelay, rpio.OUTPUT);
+rpio.open(compressorRelay, rpio.OUTPUT);
 
-// Connect to local MQTT broker and start listening for commands.
+// Configure the LCD output
+var init = new Buffer([0x03, 0x03, 0x03, 0x02, 0x28, 0x0c, 0x01, 0x06]);
+var LCD_LINE1 = 0x80, LCD_LINE2 = 0xc0; LCD_LINE3 = 0x94; LCD_LINE4 = 0xD4;
+var LCD_ENABLE = 0x04, LCD_BACKLIGHT = 0x08;
+
+// Connect to local MQTT broker and start listening for commands
 client.on('connect', function () {
     client.subscribe([MQTTchannel], function (err) {
         if (err) {
             console.log(err);
         }
-    })
-})
+    });
+});
 
 // Set the status checker to run on a schedule
-var statusScheduler = schedule.scheduleJob('*/5 * * * *', updateStatus);
-// And run once for startup
-updateStatus();
+var statusScheduler = schedule.scheduleJob('*/3 * * * *', update);
+// Update once right away at startup
+update();
+console.log(`AirCon Client ${clientID} is running and listening for commands! :)`);
+
 
 
 
@@ -86,81 +86,109 @@ updateStatus();
 //##################################################################
 
 async function cool() {
-    coolCommandRunning = true;
     //start the fan first
     fanStart();
+    publishReport();
     //start compressor after fan has spun up
     setTimeout(function () {
         compressorStart();
+        publishReport();
     }, 15000); //15sec delay
-    coolCommandRunning = false;
 }
 
 async function shutdown() {
-    shutdownCommandRunning = true;
     //stop the compressor first
     compressorStop();
+    publishReport();
     //stop the fan after coil defrost delay
     setTimeout(function () {
         fanStop();
+        publishReport();
     }, 180000); //3min defrost
-    shutdownCommandRunning = false;
 }
 
-function updateStatus() {
-    // Update all system values to current
-    currentTemp; // = getTempNow();
+function motorCheckup() {
     compressorOn = rpio.read(compressorRelay) ? true : false;
     fanOn = rpio.read(fanRelay) ? true : false;
 
-    // Run any necessary tasks based on this new info
-    if (!systemEnabled && compressorOn && fanOn && !shutdownCommandRunning) {
-        shutdown();
+    // Compressor safety
+    if (compressorOn && !fanOn) {
+        compressorStop();
+        systemEnabled = false;
+        client.publish("------------  COMPRESSOR E-STOP TRIGGERED! System shutting down to prevent damage!  ------------");
+        console.log(chalk.red("COMPRESSOR E-STOP SHUTDOWN TRIGGERED! SYSTEM REVIEW REQUIRED"));
     }
-    if (!systemEnabled && compressorOn) {
-        compressorStop(); // Safety check so compressor doesn't get left on without the fan
-    }
-    if (systemEnabled && (currentTemp >= setTemp + 1) && !(currentDuty=="Cooling" || coolCommandRunning)) {
-        cool();
-    }
-    if (systemEnabled && (currentTemp <= setTemp - 2) && !(currentDuty=="Defrosting" || shutdownCommandRunning)) {
-        shutdown();
-    }
+}
 
-    // Update the operational status
-    setTimeout(function () {
-        if ((systemEnabled && fanOn && compressorOn) || coolCommandRunning) {
-            currentDuty = "Cooling";
+
+function update() {
+    // Update all system values to current
+    //currentTemp; // = getTempNow();
+
+    // Check on our motors
+    motorCheckup();
+
+    if (systemEnabled) {
+        if (currentDuty == "Idle") {
+            if (currentTemp > setTemp) {
+                currentDuty = "Cool";
+                startTime = new Date();
+                cool();
+            }
+            // Otherwise stay idle
+            else {
+                publishReport();
+            }
         }
-        else if ((systemEnabled && fanOn && !compressorOn) || shutdownCommandRunning) {
-            currentDuty = "Defrosting";
+        else if (currentDuty == "Cool") {
+            if (currentTemp <= setTemp - 2) {
+                currentDuty = "Idle";
+                startTime = new Date();
+                shutdown();
+            }
+            // Otherwise stay idle
+            else {
+                publishReport();
+            }
         }
-        else if (systemEnabled && !fanOn && !compressorOn) {
-            currentDuty = "Idle";
+    }
+    // Kill the system if disabled and not already killed
+    else {
+        if (currentDuty == "OFF") {
+            publishReport();
         }
         else {
-            currentDuty = "Off";
+            currentDuty = "OFF";
+            startTime = new Date();
+            shutdown();
+            publishReport();
         }
-    }, 600)
+    }
+}
 
+
+function publishReport() {
+    motorCheckup();
+    // Check our time in current mode
+    cycleTime = (new Date() - startTime);
     // Build JSON status report
     let statusJSON = {
-        "System-Enabled": systemEnabled,
-        'Duty': currentDuty,
-        "Current Cool Time": cycleTime,
-        "Compressor Running": compressorOn,
-        "Fan Running": fanOn,
-        "Current Temp": currentTemp,
-        "Set Temp": setTemp,
-        "Cool Command Processing": coolCommandRunning,
-        "Shutdown command processing": shutdownCommandRunning
-    }
+        "Enabled": systemEnabled,
+        'Task': currentDuty,
+        "Runtime": msToTime(cycleTime),
+        "FanON": fanOn,
+        "CompON": compressorOn,
+        "Temp": currentTemp,
+        "SetTemp": setTemp,
+        "Timestamp": new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString()
+    };
 
-    // Log the status
-    // updateLCD(statusJSON);
+    // Log and display the status
     console.log(statusJSON);
+    updateLCD(statusJSON);
     client.publish(MQTTchannel, JSON.stringify(statusJSON));
 }
+
 
 
 
@@ -170,21 +198,26 @@ function updateStatus() {
 
 // Note: High is ON, Low is OFF!
 
+
+//////////////////////////////////// SET THESE TO WHAT IS COMMENTED FOR THE AC!!! ///////////////////////////////////
+
+
 function compressorStart() {
-    rpio.open(compressorRelay, rpio.OUTPUT, rpio.HIGH); // Sets to HIGH (ON)
+    rpio.write(compressorRelay, rpio.HIGH); // Sets to HIGH (ON)
 }
 
 function compressorStop() {
-    rpio.close(compressorRelay, rpio.PIN_RESET); // Resets to LOW (OFF)
+    rpio.write(compressorRelay, rpio.LOW); // Resets to LOW (OFF)
 }
 
 function fanStart() {
-    rpio.open(fanRelay, rpio.OUTPUT, rpio.HIGH); // Sets to HIGH (ON)
+    rpio.write(fanRelay, rpio.HIGH); // Sets to HIGH (ON)
 }
 
 function fanStop() {
-    rpio.close(fanRelay, rpio.PIN_RESET); // Resets to LOW (OFF)
+    rpio.write(fanRelay, rpio.LOW); // Resets to LOW (OFF)
 }
+
 
 
 
@@ -192,7 +225,46 @@ function fanStop() {
 //                          LCD Control
 //##################################################################
 
-// Coming soon!!
+/*
+ * Data is written 4 bits at a time with the lower 4 bits containing the mode.
+ */
+function lcdwrite4(data) {
+    rpio.i2cWrite(Buffer([(data | LCD_BACKLIGHT)]));
+    rpio.i2cWrite(Buffer([(data | LCD_ENABLE | LCD_BACKLIGHT)]));
+    rpio.i2cWrite(Buffer([((data & ~LCD_ENABLE) | LCD_BACKLIGHT)]));
+}
+function lcdwrite(data, mode) {
+    lcdwrite4(mode | (data & 0xF0));
+    lcdwrite4(mode | ((data << 4) & 0xF0));
+}
+
+/*
+ * Write a string to the specified LCD line.
+ */
+function lineout(str, addr) {
+    lcdwrite(addr, 0);
+
+    str.split('').forEach(function (c) {
+        lcdwrite(c.charCodeAt(0), 1);
+    });
+}
+
+function updateLCD(data) {
+    rpio.i2cBegin();
+    rpio.i2cSetSlaveAddress(0x27);
+    rpio.i2cSetBaudRate(10000);
+
+    for (var i = 0; i < init.length; i++)
+        lcdwrite(init[i], 0);
+
+    lineout(`Status: ${data.Task}`, LCD_LINE1);
+    lineout(`For: ${msToTime(data.Runtime)}`, LCD_LINE2);
+    lineout(`Current: ${data.Temp}`, LCD_LINE3);
+    lineout(`Set: ${data.SetTemp}`, LCD_LINE4);
+
+    rpio.i2cEnd();
+}
+
 
 
 
@@ -200,37 +272,37 @@ function fanStop() {
 //                         Event Handlers
 //##################################################################
 
-console.log(`Client ${clientID} is running and listening for commands! :)`);
-client.publish(MQTTchannel, `Client ${clientID} is online!`);
+client.publish(MQTTchannel, `AirCon Client ${clientID} is online!`);
 
 // For client listening to command publisher: 
 client.on('message', function (topic, message) {
-    // message is Buffer
     //console.log("Incoming command message: " + message.toString())
-    if (message.toString().includes("setTemp")) {
-        setTemp = Number(message.toString().slice(message.toString().lastIndexOf('_') + 1));
-        updateStatus();
+    if (message.toString().includes("set")) {
+        setTemp = Number(message.toString().slice(message.toString().lastIndexOf('-') + 1));
+        update();
     }
-    if (message.toString() === "ON") {
+    if (message.toString() === "on") {
         systemEnabled = true;
-        updateStatus();
+        currentDuty = "Idle";
+        update();
     }
-    if (message.toString() === "OFF") {
+    if (message.toString() === "off") {
         systemEnabled = false;
-        updateStatus();
+        update();
     }
     if (message.toString() === "status") {
-        updateStatus();
+        publishReport();
     }
-    if (message.toString() === "COOL") {
+    if (message.toString() === "cool") {
         cool();
-        updateStatus();
+        update();
     }
-    if (message.toString() === "STOP") {
+    if (message.toString() === "stop") {
         shutdown();
-        updateStatus();
+        update();
     }
-})
+});
+
 
 
 
@@ -245,3 +317,15 @@ function validateLCDText(message) {
     // Check a message for being of right length and format prior to sending to the LCD to display. (for a 20x4 char LCD)
 }
 
+function msToTime(duration) {
+    var milliseconds = parseInt((duration % 1000) / 100),
+        seconds = Math.floor((duration / 1000) % 60),
+        minutes = Math.floor((duration / (1000 * 60)) % 60),
+        hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
+
+    hours = (hours < 10) ? "0" + hours : hours;
+    minutes = (minutes < 10) ? "0" + minutes : minutes;
+    seconds = (seconds < 10) ? "0" + seconds : seconds;
+
+    return hours + ":" + minutes;
+}
