@@ -1,2 +1,2 @@
 # PiStat
- An modern control system for my ancient air conditioning unit.
+ A modern control system for an ancient air conditioning unit.
