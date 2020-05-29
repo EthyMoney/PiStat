@@ -1,28 +1,46 @@
 /*
- /$$$$$$$ /$$       /$$$$$$$                    /$$                         /$$   /$$           /$$    
-| $$__  $|__/      | $$__  $$                  |__/                        | $$$ | $$          | $$    
-| $$  \ $$/$$      | $$  \ $$ /$$$$$$ /$$    /$$/$$ /$$$$$$$ /$$$$$$       | $$$$| $$ /$$$$$$ /$$$$$$  
-| $$$$$$$| $$      | $$  | $$/$$__  $|  $$  /$$| $$/$$_____//$$__  $$      | $$ $$ $$/$$__  $|_  $$_/  
-| $$____/| $$      | $$  | $| $$$$$$$$\  $$/$$/| $| $$     | $$$$$$$$      | $$  $$$| $$$$$$$$ | $$    
-| $$     | $$      | $$  | $| $$_____/ \  $$$/ | $| $$     | $$_____/      | $$\  $$| $$_____/ | $$ /$$
-| $$     | $$      | $$$$$$$|  $$$$$$$  \  $/  | $|  $$$$$$|  $$$$$$$      | $$ \  $|  $$$$$$$ |  $$$$/
-|__/     |__/      |_______/ \_______/   \_/   |__/\_______/\_______/      |__/  \__/\_______/  \___/     ------> AirCon Client
+ /$$$$$$$  /$$        /$$$$$$  /$$                  /$$$$$$                            /$$ /$$   /$$     /$$
+| $$__  $$|__/       /$$__  $$|__/                 /$$__  $$                          | $$|__/  | $$    |__/
+| $$  \ $$ /$$      | $$  \ $$ /$$  /$$$$$$       | $$  \__/  /$$$$$$  /$$$$$$$   /$$$$$$$ /$$ /$$$$$$   /$$  /$$$$$$  /$$$$$$$   /$$$$$$   /$$$$$$
+| $$$$$$$/| $$      | $$$$$$$$| $$ /$$__  $$      | $$       /$$__  $$| $$__  $$ /$$__  $$| $$|_  $$_/  | $$ /$$__  $$| $$__  $$ /$$__  $$ /$$__  $$
+| $$____/ | $$      | $$__  $$| $$| $$  \__/      | $$      | $$  \ $$| $$  \ $$| $$  | $$| $$  | $$    | $$| $$  \ $$| $$  \ $$| $$$$$$$$| $$  \__/
+| $$      | $$      | $$  | $$| $$| $$            | $$    $$| $$  | $$| $$  | $$| $$  | $$| $$  | $$ /$$| $$| $$  | $$| $$  | $$| $$_____/| $$
+| $$      | $$      | $$  | $$| $$| $$            |  $$$$$$/|  $$$$$$/| $$  | $$|  $$$$$$$| $$  |  $$$$/| $$|  $$$$$$/| $$  | $$|  $$$$$$$| $$
+|__/      |__/      |__/  |__/|__/|__/             \______/  \______/ |__/  |__/ \_______/|__/   \___/  |__/ \______/ |__/  |__/ \_______/|__/
 
 
-Description: My personal tool to control my LEDs and stuff. This program will have the end goal of communicating
-with other rPis around my room and managing the flow of commands between them to control devices. For now, this program
-is being used to directly test control of devices, and will later be adapted to pass on this control to other rPis.
+Description:
 
-*** This file is the client that run on the Pis that are distibuted around the home and will listen to commands
-from the main host Pi over MQTT. This file is meant to be rather generic so it can be dropped onto any pi and simply
-change the client #, and then add or remove whatever specific functionality you want that pi to support.
+-This is a control program designed to be run right on a Raspberry Pi to control a window air conditioning unit using GPIO and relays.
+It's super simple and to the point. There a basic control interface and support for status output to a 20x4 i2c LCD.
+-This program receives command input and reports statuses over MQTT which makes communication with other programs and services super easy!
+-This program features the ability to control the two main components of an any air conditioner: the compressor, and the fan.
+-Because this program takes full control of the 2 primary components of an AC unit, it can be used to control nearly ANY air conditioner!
+-Control over these 2 parts is done using two high-aperage relays that are switched on and off by the GPIO of the Raspberry Pi.
+-You need to wire up your relays and Pi in your AC unit to take control of the compressor and fan. This may mean completely gutting and 
+replacing the current existing control circuitry in your unit. Please understand that this could be dangerous, and should not be attempted
+without a proper understanding of mains AC power and potential hazards such as electrical shock from the run capacitor. PLEASE be careful!
+-To get started, Included with this program is a pre-made Windows application that enables communication and control from any PC! Simply
+set your MQTT broker address and channel that you want to use, and you are good to go! The Windows app has all that you need to get up and 
+running. You can see basic and detailed statistics, as well as set the modes and temperatures that you desire.
+-Feel free to add to the experience! Thanks to MQTT, there are many other ways to communicate with this program as well as plenty of
+flexability for expansion of features and interation! I've provided all the basic data and controls that you need, go ahead and run with it :)
 
 
-Author: Logan (YoloSwagDogDiggity)
-Version: 1.0.0 (InDev)
+*** DISCLAIMER: ***
+While I have integrated many safety and reliability features, done extensive testing, and personally run this program, I absolutely 
+CANNOT guarantee that it is perfect and problem-free. Use of this program is done at your own risk and you take full responsibility for
+any issues and damages that you may encounter. With that said, I do still greatly appreciate feedback for any issues you find or
+improvement suggestions that you may have. Please feel free to report issues on the GitHub repo or reach out to me directly.
+
+Finally, if you use this program and enjoy it, please consider starring my GitHub repo to show support! I know this isn't the most
+amazing or complex piece of software you've ever seen, but I really hope it helps improve your life even if it's just a little bit!
+
+
+Author: Logan (GitHub: YoloSwagDogDiggity)
+Version: 1.0.0b (InDev)
 Started: 5/13/2020
 */
-
 
 
 //##################################################################
@@ -42,9 +60,9 @@ let fanOn = false;
 let cycleTime = '';
 let systemEnabled = false;
 let currentDuty = 'OFF';
-let startTime = new Date();
+let startTime = new Date(); //start counting the cycle time
 
-// Setup service veriables
+// Setup of program variables
 let MQTTchannel = "pi9_aircon";
 let chalk = require('chalk');
 var mqtt = require('mqtt');
@@ -58,12 +76,12 @@ rpio.init({ mapping: 'gpio' });
 rpio.open(fanRelay, rpio.OUTPUT);
 rpio.open(compressorRelay, rpio.OUTPUT);
 
-// Configure the LCD output
+// Configure the LCD output (20 columns by 4 rows)
 var init = new Buffer([0x03, 0x03, 0x03, 0x02, 0x28, 0x0c, 0x01, 0x06]);
 var LCD_LINE1 = 0x80, LCD_LINE2 = 0xc0; LCD_LINE3 = 0x94; LCD_LINE4 = 0xD4;
 var LCD_ENABLE = 0x04, LCD_BACKLIGHT = 0x08;
 
-// Connect to local MQTT broker and start listening for commands
+// Connect to MQTT broker and start listening on the control channel
 client.on('connect', function () {
     client.subscribe([MQTTchannel], function (err) {
         if (err) {
@@ -72,10 +90,11 @@ client.on('connect', function () {
     });
 });
 
-// Set the status checker to run on a schedule
+// Set the system updater to run on a schedule of every 3 minutes
 var statusScheduler = schedule.scheduleJob('*/3 * * * *', update);
 // Update once right away at startup
 update();
+// Report that we are ready for action!
 console.log(`AirCon Client ${clientID} is running and listening for commands! :)`);
 
 
@@ -85,6 +104,7 @@ console.log(`AirCon Client ${clientID} is running and listening for commands! :)
 //                     Unit Control Management
 //##################################################################
 
+// Perform an elegant startup of the unit
 async function cool() {
     //start the fan first
     fanStart();
@@ -92,6 +112,7 @@ async function cool() {
     //start compressor after fan has spun up
     setTimeout(function () {
         motorCheckup();
+        //make sure the fan is on AND the current status hasn't been changed back to idle/off while we waited
         if(fanOn){
             compressorStart();
             publishReport();
@@ -99,6 +120,7 @@ async function cool() {
     }, 15000); //15sec delay
 }
 
+// Perform an elegant shutdown of the unit
 async function shutdown() {
     //stop the compressor first
     compressorStop();
@@ -106,6 +128,7 @@ async function shutdown() {
     //stop the fan after coil defrost delay
     setTimeout(function () {
         motorCheckup();
+        //make sure the current status hasn't been changed back to cooling while we waited
         if(!compressorOn){
             fanStop();
             publishReport();
@@ -113,11 +136,12 @@ async function shutdown() {
     }, 180000); //3min defrost
 }
 
+// Retrieve the status of the relays to know what our motors are doing
 function motorCheckup() {
     compressorOn = rpio.read(compressorRelay) ? true : false;
     fanOn = rpio.read(fanRelay) ? true : false;
 
-    // Compressor safety
+    // Emergency compressor safety (prevents compressor from running without airflow from the fan)
     if (compressorOn && !fanOn) {
         compressorStop();
         systemEnabled = false;
@@ -126,15 +150,16 @@ function motorCheckup() {
     }
 }
 
-
+// Update all system values to current and set the operational modes
 function update() {
-    // Update all system values to current
     //currentTemp; // = getTempNow();
 
-    // Check on our motors
+    // Check in on our compressor and fan motors
     motorCheckup();
 
+    // See if we're enabled to run, then verify running operation
     if (systemEnabled) {
+        // Check temp and adjust operation if needed
         if (currentDuty == "Idle") {
             if (currentTemp > setTemp) {
                 currentDuty = "Cool";
@@ -143,26 +168,35 @@ function update() {
             }
             // Otherwise stay idle
             else {
+                if(compressorOn){
+                    shutdown(); // Sanity check in case we are not fully idle
+                }
                 publishReport();
             }
         }
+        // Check temp and adjust operation if needed
         else if (currentDuty == "Cool") {
             if (currentTemp <= setTemp - 2) {
                 currentDuty = "Idle";
                 startTime = new Date();
                 shutdown();
             }
-            // Otherwise stay idle
+            // Otherwise stay cooling
             else {
+                if(!compressorOn){
+                    cool(); // Sanity check in case we are not fully up and cooling
+                }
                 publishReport();
             }
         }
     }
-    // Kill the system if disabled and not already killed
+    // System is disabled! Lets make sure that it's set correctly
     else {
+        // If disabled, stay disabled and update stats
         if (currentDuty == "OFF") {
             publishReport();
         }
+        // Otherwise switch to disabled state
         else {
             currentDuty = "OFF";
             startTime = new Date();
@@ -172,10 +206,10 @@ function update() {
     }
 }
 
-
+// Report our current overall system status and refresh the LCD values
 function publishReport() {
     motorCheckup();
-    // Check our time in current mode
+    // Check the time spent in the current mode
     cycleTime = (new Date() - startTime);
     // Build JSON status report
     let statusJSON = {
@@ -203,10 +237,7 @@ function publishReport() {
 //##################################################################
 
 // Note: High is ON, Low is OFF!
-
-
-//////////////////////////////////// SET THESE TO WHAT IS COMMENTED FOR THE AC!!! ///////////////////////////////////
-
+// SET THESE TO WHAT IS COMMENTED FOR THE AC!!!
 
 function compressorStart() {
     rpio.write(compressorRelay, rpio.HIGH); // Sets to HIGH (ON)
@@ -231,9 +262,7 @@ function fanStop() {
 //                          LCD Control
 //##################################################################
 
-/*
- * Data is written 4 bits at a time with the lower 4 bits containing the mode.
- */
+// Data is written 4 bits at a time with the lower 4 bits containing the mode.
 function lcdwrite4(data) {
     rpio.i2cWrite(Buffer([(data | LCD_BACKLIGHT)]));
     rpio.i2cWrite(Buffer([(data | LCD_ENABLE | LCD_BACKLIGHT)]));
@@ -244,9 +273,7 @@ function lcdwrite(data, mode) {
     lcdwrite4(mode | ((data << 4) & 0xF0));
 }
 
-/*
- * Write a string to the specified LCD line.
- */
+// Write a string to the specified LCD line.
 function lineout(str, addr) {
     lcdwrite(addr, 0);
 
@@ -255,6 +282,7 @@ function lineout(str, addr) {
     });
 }
 
+// Write the status data to the LCD
 function updateLCD(data) {
     rpio.i2cBegin();
     rpio.i2cSetSlaveAddress(0x27);
@@ -278,34 +306,30 @@ function updateLCD(data) {
 //                         Event Handlers
 //##################################################################
 
-client.publish(MQTTchannel, `AirCon Client ${clientID} is online!`);
+// Initial "hello" to the MQTT channel
+client.publish(MQTTchannel, `AirCon Controller Client ${clientID} is online!`);
 
-// For client listening to command publisher: 
+// Listen for messages on MQTT channel and process them accordingly
 client.on('message', function (topic, message) {
-    //console.log("Incoming command message: " + message.toString())
+    //set temp
     if (message.toString().includes("set")) {
         setTemp = Number(message.toString().slice(message.toString().lastIndexOf('-') + 1));
         update();
     }
+    //enable system
     if (message.toString() === "on") {
         systemEnabled = true;
         currentDuty = "Idle";
         update();
     }
+    //disable system
     if (message.toString() === "off") {
         systemEnabled = false;
         update();
     }
+    //report current status
     if (message.toString() === "status") {
         publishReport();
-    }
-    if (message.toString() === "cool") {
-        cool();
-        update();
-    }
-    if (message.toString() === "stop") {
-        shutdown();
-        update();
     }
 });
 
@@ -316,15 +340,9 @@ client.on('message', function (topic, message) {
 //                      Supporting Functions
 //##################################################################
 
-// These will be here to help complete other tasks or provide validations and testing before running a command.
-
-// TO-DO:
-function validateLCDText(message) {
-    // Check a message for being of right length and format prior to sending to the LCD to display. (for a 20x4 char LCD)
-}
-
+// Takes the cycle time in milliseconds and converts it to a human readable time format of hours and minutes
 function msToTime(duration) {
-    var milliseconds = parseInt((duration % 1000) / 100),
+    let milliseconds = parseInt((duration % 1000) / 100),
         seconds = Math.floor((duration / 1000) % 60),
         minutes = Math.floor((duration / (1000 * 60)) % 60),
         hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
