@@ -91,8 +91,11 @@ async function cool() {
     publishReport();
     //start compressor after fan has spun up
     setTimeout(function () {
-        compressorStart();
-        publishReport();
+        motorCheckup();
+        if(fanOn){
+            compressorStart();
+            publishReport();
+        }
     }, 15000); //15sec delay
 }
 
@@ -102,8 +105,11 @@ async function shutdown() {
     publishReport();
     //stop the fan after coil defrost delay
     setTimeout(function () {
-        fanStop();
-        publishReport();
+        motorCheckup();
+        if(!compressorOn){
+            fanStop();
+            publishReport();
+        }
     }, 180000); //3min defrost
 }
 
