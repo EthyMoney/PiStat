@@ -181,7 +181,7 @@ function publishReport() {
     let statusJSON = {
         "Enabled": systemEnabled,
         'Task': currentDuty,
-        "Runtime": msToTime(cycleTime),
+        "Runtime": cycleTime,
         "FanON": fanOn,
         "CompON": compressorOn,
         "Temp": currentTemp,
