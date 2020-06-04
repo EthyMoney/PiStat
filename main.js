@@ -64,6 +64,7 @@ let startTime = new Date(); //start counting the cycle time
 
 // Setup of program variables
 let MQTTchannel = "pi9_aircon";
+let MQTTchannel_temp = "pi9_aircon/temp";
 let chalk = require('chalk');
 var mqtt = require('mqtt');
 var client = mqtt.connect('mqtt://192.168.1.28');
@@ -83,7 +84,7 @@ var LCD_ENABLE = 0x04, LCD_BACKLIGHT = 0x08;
 
 // Connect to MQTT broker and start listening on the control channel
 client.on('connect', function () {
-    client.subscribe([MQTTchannel], function (err) {
+    client.subscribe([MQTTchannel, MQTTchannel_temp], function (err) {
         if (err) {
             console.log(err);
         }
@@ -113,7 +114,7 @@ async function cool() {
     setTimeout(function () {
         motorCheckup();
         //make sure the fan is on AND the current status hasn't been changed back to idle/off while we waited
-        if(fanOn){
+        if (fanOn) {
             compressorStart();
             publishReport();
         }
@@ -129,7 +130,7 @@ async function shutdown() {
     setTimeout(function () {
         motorCheckup();
         //make sure the current status hasn't been changed back to cooling while we waited
-        if(!compressorOn){
+        if (!compressorOn) {
             fanStop();
             publishReport();
         }
@@ -168,7 +169,7 @@ function update() {
             }
             // Otherwise stay idle
             else {
-                if(compressorOn){
+                if (compressorOn) {
                     shutdown(); // Sanity check in case we are not fully idle
                 }
                 publishReport();
@@ -183,7 +184,7 @@ function update() {
             }
             // Otherwise stay cooling
             else {
-                if(!compressorOn){
+                if (!compressorOn) {
                     cool(); // Sanity check in case we are not fully up and cooling
                 }
                 publishReport();
@@ -311,25 +312,30 @@ client.publish(MQTTchannel, `AirCon Controller Client ${clientID} is online!`);
 
 // Listen for messages on MQTT channel and process them accordingly
 client.on('message', function (topic, message) {
-    //set temp
-    if (message.toString().includes("set")) {
-        setTemp = Number(message.toString().slice(message.toString().lastIndexOf('-') + 1));
-        update();
+    if (topic == MQTTchannel) {
+        //set temp
+        if (message.toString().includes("set")) {
+            setTemp = Number(message.toString().slice(message.toString().lastIndexOf('-') + 1));
+            update();
+        }
+        //enable system
+        if (message.toString() === "on") {
+            systemEnabled = true;
+            currentDuty = "Idle";
+            update();
+        }
+        //disable system
+        if (message.toString() === "off") {
+            systemEnabled = false;
+            update();
+        }
+        //report current status
+        if (message.toString() === "status") {
+            publishReport();
+        }
     }
-    //enable system
-    if (message.toString() === "on") {
-        systemEnabled = true;
-        currentDuty = "Idle";
-        update();
-    }
-    //disable system
-    if (message.toString() === "off") {
-        systemEnabled = false;
-        update();
-    }
-    //report current status
-    if (message.toString() === "status") {
-        publishReport();
+    else if (topic == MQTTchannel_temp) {
+        currentTemp = message;
     }
 });
 
