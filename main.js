@@ -335,7 +335,7 @@ client.on('message', function (topic, message) {
         }
     }
     else if (topic == MQTTchannel_temp) {
-        currentTemp = message;
+        currentTemp = message.toString();
     }
 });
 
