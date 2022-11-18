@@ -21,7 +21,7 @@ const MQTT_BROKER_ENDPOINT = 'mqtt://192.168.1.28';
 import chalk from 'chalk';
 import mqtt from 'mqtt';
 import schedule from 'node-schedule';
-const rpio = require('rpio');
+import rpio from 'rpio';
 
 // System runtime values
 let currentTemp = 70; //needs to get set by sensor
@@ -223,9 +223,9 @@ function fanStop() {
 
 // Data is written 4 bits at a time with the lower 4 bits containing the mode.
 function lcdwrite4(data) {
-  rpio.i2cWrite(Buffer([(data | LCD_BACKLIGHT)]));
-  rpio.i2cWrite(Buffer([(data | LCD_ENABLE | LCD_BACKLIGHT)]));
-  rpio.i2cWrite(Buffer([((data & ~LCD_ENABLE) | LCD_BACKLIGHT)]));
+  rpio.i2cWrite(Buffer.from([(data | LCD_BACKLIGHT)]));
+  rpio.i2cWrite(Buffer.from([(data | LCD_ENABLE | LCD_BACKLIGHT)]));
+  rpio.i2cWrite(Buffer.from([((data & ~LCD_ENABLE) | LCD_BACKLIGHT)]));
 }
 function lcdwrite(data, mode) {
   lcdwrite4(mode | (data & 0xF0));
