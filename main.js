@@ -10,7 +10,7 @@ Started: 5/13/2020
 //##################################################################
 
 // Instance constants
-const MQTT_CLIENT_IDENTIFIER = 9; //set this to whatever you want, I was just using it as a way to distinguish this mqtt client from others
+const MQTT_CLIENT_IDENTIFIER = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 5)}`;
 const FAN_RELAY_PIN = 23;
 const COMPRESSOR_RELAY_PIN = 24;
 const MQTT_CONTROL_CHANNEL = 'home/shop/aircon';
@@ -49,9 +49,14 @@ const client = mqtt.connect(MQTT_BROKER_ENDPOINT);
 client.on('connect', function () {
   client.subscribe([MQTT_CONTROL_CHANNEL, MQTT_TEMPERATURE_CHANNEL], function (err) {
     if (err) {
-      console.log(err);
+      console.error('Failed to subscribe to MQTT channels:', err);
     }
   });
+});
+
+// Handle MQTT connection errors
+client.on('error', function (error) {
+  console.error('MQTT connection error:', error);
 });
 
 // Set the system updater to run on a schedule of every 3 minutes
@@ -172,6 +177,14 @@ function publishReport() {
   motorCheckup();
   // Check the time spent in the current mode
   cycleTime = (new Date() - startTime);
+  // Make timestamp in normal human readable format
+  const date = new Date();
+  const timeOptions = {
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: true
+  };
+  const formattedTime = date.toLocaleDateString() + ' ' + date.toLocaleTimeString(undefined, timeOptions);
   // Build JSON status report
   let statusJSON = {
     'Enabled': systemEnabled,
@@ -181,7 +194,7 @@ function publishReport() {
     'CompON': compressorOn,
     'Temp': currentTemp,
     'SetTemp': setTemp,
-    'Timestamp': new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString()
+    'Timestamp': formattedTime
   };
 
   // Log and display the status
@@ -269,30 +282,34 @@ client.publish(MQTT_CONTROL_CHANNEL, `AirCon Controller Client ${MQTT_CLIENT_IDE
 
 // Listen for messages on MQTT channel and process them accordingly
 client.on('message', function (topic, message) {
-  if (topic == MQTT_CONTROL_CHANNEL) {
-    //set temp
-    if (message.toString().includes('set')) {
-      setTemp = Number(message.toString().slice(message.toString().lastIndexOf('-') + 1));
-      update();
+  try {
+    if (topic == MQTT_CONTROL_CHANNEL) {
+      //set temp
+      if (message.toString().includes('set')) {
+        setTemp = Number(message.toString().slice(message.toString().lastIndexOf('-') + 1));
+        update();
+      }
+      //enable system
+      if (message.toString() === 'on') {
+        systemEnabled = true;
+        currentDuty = 'Idle';
+        update();
+      }
+      //disable system
+      if (message.toString() === 'off') {
+        systemEnabled = false;
+        update();
+      }
+      //report current status
+      if (message.toString() === 'status') {
+        publishReport();
+      }
     }
-    //enable system
-    if (message.toString() === 'on') {
-      systemEnabled = true;
-      currentDuty = 'Idle';
-      update();
+    else if (topic == MQTT_TEMPERATURE_CHANNEL) {
+      currentTemp = Number(message.toString());
     }
-    //disable system
-    if (message.toString() === 'off') {
-      systemEnabled = false;
-      update();
-    }
-    //report current status
-    if (message.toString() === 'status') {
-      publishReport();
-    }
-  }
-  else if (topic == MQTT_TEMPERATURE_CHANNEL) {
-    currentTemp = Number(message.toString());
+  } catch (error) {
+    console.error('Error while processing MQTT message:', error);
   }
 });
 
