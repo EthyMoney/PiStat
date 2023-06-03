@@ -14,6 +14,8 @@ const client = mqtt.connect(MQTT_SERVER, { reconnectPeriod: 5000 });
 client.on('connect', function () {
   client.publish(MQTT_CHANNEL_TEMP, "Connected");
   console.log("Connected to MQTT server")
+  // Run temp check once right at startup
+  reportTemp(true);
 });
 client.on('reconnect', function () {
   console.log('Reconnecting to the MQTT server...');
@@ -37,9 +39,6 @@ function reportTemp(firstRun) {
     console.error(err);
   }
 }
-
-// Run once at startup
-reportTemp(true);
 
 // Then do update every 30 seconds
 setInterval(reportTemp, 30000);
