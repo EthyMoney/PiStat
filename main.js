@@ -13,9 +13,9 @@ Started: 5/13/2020
 const MQTT_CLIENT_IDENTIFIER = 9; //set this to whatever you want, I was just using it as a way to distinguish this mqtt client from others
 const FAN_RELAY_PIN = 23;
 const COMPRESSOR_RELAY_PIN = 24;
-const MQTT_CONTROL_CHANNEL = 'pi9_aircon';
-const MQTT_TEMPERATURE_CHANNEL = 'pi9_aircon/temp';
-const MQTT_BROKER_ENDPOINT = 'mqtt://192.168.1.28';
+const MQTT_CONTROL_CHANNEL = 'home/shop/aircon';
+const MQTT_TEMPERATURE_CHANNEL = MQTT_CONTROL_CHANNEL + '/temp';
+const MQTT_BROKER_ENDPOINT = 'mqtt://192.168.1.55';
 
 // Imports
 import chalk from 'chalk';
