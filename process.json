@@ -1,6 +1,21 @@
 {
   "apps": [
     {
+      "name": "temp",
+      "script": "temperature.js",
+      "log_date_format": "YYYY-MM-DD HH:mm",
+      "ignoreWatch": [
+        "node_modules"
+      ],
+      "watch": false,
+      "args": [
+        "--color"
+      ],
+      "env": {
+        "DEBUG_COLORS": true
+      }
+    },
+    {
       "name": "aircon",
       "script": "main.js",
       "log_date_format": "YYYY-MM-DD HH:mm",
