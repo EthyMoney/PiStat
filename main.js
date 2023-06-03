@@ -306,7 +306,11 @@ client.on('message', function (topic, message) {
       }
     }
     else if (topic == MQTT_TEMPERATURE_CHANNEL) {
-      currentTemp = Number(message.toString());
+      // check if the message is a number
+      if (!isNaN(message.toString())) {
+        //if it is a number, update the current temp
+        currentTemp = Number(message.toString());
+      }
     }
   } catch (error) {
     console.error('Error while processing MQTT message:', error);
