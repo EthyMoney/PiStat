@@ -1,8 +1,8 @@
 {
   "apps": [
     {
-      "name": "temp",
-      "script": "temperature.js",
+      "name": "aircon",
+      "script": "main.js",
       "log_date_format": "YYYY-MM-DD HH:mm",
       "ignoreWatch": [
         "node_modules"
@@ -16,8 +16,8 @@
       }
     },
     {
-      "name": "aircon",
-      "script": "main.js",
+      "name": "temp",
+      "script": "temperature.js",
       "log_date_format": "YYYY-MM-DD HH:mm",
       "ignoreWatch": [
         "node_modules"
