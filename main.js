@@ -59,8 +59,8 @@ client.on('error', function (error) {
   console.error('MQTT connection error:', error);
 });
 
-// Set the system updater to run on a schedule of every 3 minutes
-schedule.scheduleJob('*/3 * * * *', update);
+// Set the system updater to run on a schedule of every 1 minutes
+schedule.scheduleJob('*/1 * * * *', update);
 
 // Update once right away at startup
 update();
