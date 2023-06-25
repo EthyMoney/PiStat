@@ -127,7 +127,7 @@ function update() {
   if (systemEnabled) {
     // Check temp and adjust operation if needed
     if (currentDuty == 'Idle') {
-      if (currentTemp > setTemp) {
+      if (currentTemp > setTemp + .5) {
         currentDuty = 'Cool';
         startTime = new Date();
         cool();
