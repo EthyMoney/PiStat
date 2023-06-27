@@ -32,6 +32,7 @@ let cycleTime = '';
 let systemEnabled = false;
 let currentDuty = 'OFF';
 let startTime = new Date(); //start counting the cycle time
+let compressorLastOffTime = 0; //store the last time the compressor was turned off (for compressor start lockout)
 
 // Configure rpio and set relay pins
 rpio.init({ gpiomem: false });
@@ -75,7 +76,16 @@ console.log(`AirCon Client ${MQTT_CLIENT_IDENTIFIER} is running and listening fo
 //##################################################################
 
 // Perform an elegant startup of the unit
-async function cool() {
+function cool() {
+  //enforce compressor start lockout (don't start the compressor if it was shut down less than 5 minutes ago)
+  //pressure in the system needs time to equalize before restarting compressor to prevent it from seizing and getting damaged
+  let timeNow = Date.now();
+  if (timeNow - compressorLastOffTime < 5 * 60 * 1000) {
+    console.log(chalk.yellow('COMPRESSOR LOCKOUT: Compressor was shut down less than 5 minutes ago, delaying startup...'));
+    let delayTime = 5 * 60 * 1000 - (timeNow - compressorLastOffTime);
+    setTimeout(cool, delayTime);
+    return;
+  }
   //start the fan first, then compressor after delay, then update status
   fanStart();
   publishReport();
@@ -90,7 +100,7 @@ async function cool() {
 }
 
 // Perform an elegant shutdown of the unit
-async function shutdown() {
+function shutdown() {
   //stop the compressor first, then fan after a defrost delay, then update status
   compressorStop();
   publishReport();
@@ -218,6 +228,7 @@ function compressorStart() {
 
 function compressorStop() {
   rpio.write(COMPRESSOR_RELAY_PIN, rpio.LOW); // Resets to LOW (OFF)
+  compressorLastOffTime = Date.now(); // Update the last time compressor was turned off for startup lockout
 }
 
 function fanStart() {
